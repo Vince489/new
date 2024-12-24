@@ -7,7 +7,7 @@ let mainWindow;
 // DNS map for custom domains
 const dnsMap = {
     'my-site.virts': path.join(__dirname, 'sites/my-site/index.html'),
-    'example.virts': path.join(__dirname, 'sites/example/index.html'),
+    'example.huh': path.join(__dirname, 'sites/example/index.html'),
 };
 
 app.on('ready', () => {
@@ -35,16 +35,23 @@ app.on('ready', () => {
         }
     });
 
+    // Get the current screen's dimensions
+    const { width, height } = require('electron').screen.getPrimaryDisplay().workAreaSize;
+
     // Create the main browser window
     mainWindow = new BrowserWindow({
-        width: 800,
-        height: 600,
+        width: width,
+        height: height,
         webPreferences: {
             nodeIntegration: true, // Enable Node.js integration
             contextIsolation: false, // Disable context isolation
             webviewTag: true, // Enable webview support
         },
+        frame: true, // Enable frame for custom title bar
     });
+
+    // Hide the default menu bar
+    mainWindow.setMenuBarVisibility(false);
 
     // Load the main UI
     mainWindow.loadFile(path.join(__dirname, 'index.html'));
