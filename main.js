@@ -8,10 +8,7 @@ let browserView;
 // MongoDB Connection
 const connectDB = async () => {
     try {
-        await mongoose.connect('mongodb://127.0.0.1:27017/dnsmap', {
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
-        });
+        await mongoose.connect('mongodb://127.0.0.1:27017/dnsmap');
         console.log('MongoDB connected successfully');
     } catch (error) {
         console.error('MongoDB connection error:', error);
@@ -98,10 +95,10 @@ function createMainWindow() {
 
     // Handle navigation events
     ipcMain.on('navigate-back', () => {
-        if (browserView.webContents.canGoBack()) browserView.webContents.goBack();
+        if (browserView.webContents.navigationHistory.canGoBack()) browserView.webContents.navigationHistory.goBack();
     });
     ipcMain.on('navigate-forward', () => {
-        if (browserView.webContents.canGoForward()) browserView.webContents.goForward();
+        if (browserView.webContents.navigationHistory.canGoForward()) browserView.webContents.navigationHistory.goForward();
     });
     ipcMain.on('reload', () => {
         browserView.webContents.reload();
