@@ -25,7 +25,6 @@
         <button id="forward">➡️</button>
         <button id="refresh">🔄</button>
         <input type="text" id="url" placeholder="Enter URL (e.g., virts://example.huh)" />
-        <button id="go">Go</button>
     </div>
     <script>
         const { ipcRenderer } = require('electron');
@@ -34,12 +33,17 @@
         const forwardButton = document.getElementById('forward');
         const refreshButton = document.getElementById('refresh');
         const urlInput = document.getElementById('url');
-        const goButton = document.getElementById('go');
 
         backButton.addEventListener('click', () => ipcRenderer.send('navigate-back'));
         forwardButton.addEventListener('click', () => ipcRenderer.send('navigate-forward'));
         refreshButton.addEventListener('click', () => ipcRenderer.send('reload'));
-        goButton.addEventListener('click', () => ipcRenderer.send('navigate-to', urlInput.value));
+
+        // Listen for the Enter key in the URL input
+        urlInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                ipcRenderer.send('navigate-to', urlInput.value);
+            }
+        });
     </script>
 </body>
 </html>

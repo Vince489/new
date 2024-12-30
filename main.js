@@ -51,8 +51,15 @@ app.on('ready', () => {
     browserView = new BrowserView();
     mainWindow.setBrowserView(browserView);
 
-    // Set BrowserView bounds
+    // Set initial BrowserView bounds
     browserView.setBounds({ x: 0, y: 50, width: 1200, height: 750 });
+
+    // Add dynamic resizing for the BrowserView
+    mainWindow.on('resize', () => {
+        const { width, height } = mainWindow.getContentBounds(); // Get the new dimensions
+        browserView.setBounds({ x: 0, y: 50, width, height: height - 50 }); // Adjust bounds for the toolbar
+        console.log(`Resized: width=${width}, height=${height - 50}`);
+    });
 
     // Load initial URL
     browserView.webContents.loadURL('about:blank');
@@ -64,11 +71,11 @@ app.on('ready', () => {
     const { ipcMain } = require('electron');
 
     ipcMain.on('navigate-back', () => {
-        if (browserView.webContents.canGoBack()) browserView.webContents.goBack();
+        if (browserView.webContents.navigationHistory.canGoBack()) browserView.webContents.navigationHistory.goBack();
     });
 
     ipcMain.on('navigate-forward', () => {
-        if (browserView.webContents.canGoForward()) browserView.webContents.goForward();
+        if (browserView.webContents.navigationHistory.canGoForward()) browserView.webContents.navigationHistory.goForward();
     });
 
     ipcMain.on('reload', () => {
@@ -99,3 +106,4 @@ app.on('window-all-closed', () => {
 app.on('will-quit', () => {
     globalShortcut.unregisterAll();
 });
+
