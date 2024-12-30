@@ -1,8 +1,9 @@
-const { app, BrowserWindow, protocol, Menu, globalShortcut } = require('electron');
+const { app, BrowserWindow, BrowserView, protocol, Menu, globalShortcut } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
 let mainWindow;
+let browserView;
 
 // DNS map for custom domains
 const dnsMap = {
@@ -11,77 +12,82 @@ const dnsMap = {
 };
 
 app.on('ready', () => {
-    // Register the custom protocol using streams
+    // Register the custom protocol
     protocol.registerStreamProtocol('virts', (request, callback) => {
-        const url = request.url.replace('virts://', ''); // Remove protocol prefix
+        const url = request.url.replace('virts://', '');
         console.log(`Requested URL: ${url}`);
 
         const filePath = dnsMap[url];
         if (filePath) {
-            console.log(`Resolved file path: ${filePath}`);
-            // Stream the file to the response
             callback({
                 statusCode: 200,
                 headers: { 'Content-Type': 'text/html' },
                 data: fs.createReadStream(filePath),
             });
         } else {
-            console.error(`Domain not found in DNS map: ${url}`);
             callback({
                 statusCode: 404,
                 headers: { 'Content-Type': 'text/plain' },
-                data: fs.createReadStream(path.join(__dirname, '404.html')), // Optional: Serve an error page
+                data: fs.createReadStream(path.join(__dirname, '404.html')),
             });
         }
     });
 
-    // Get the current screen's dimensions
-    const { width, height } = require('electron').screen.getPrimaryDisplay().workAreaSize;
-
-    // Create the main browser window
+    // Create the main window
     mainWindow = new BrowserWindow({
-        width: width,
-        height: height,
+        width: 1200,
+        height: 800,
         webPreferences: {
-            nodeIntegration: true, // Enable Node.js integration
-            contextIsolation: false, // Disable context isolation
-            webviewTag: true, // Enable webview support
+            nodeIntegration: true,
+            contextIsolation: false,
         },
-        frame: true, // Enable frame for custom title bar
+        frame: true,
     });
 
     // Hide the default menu bar
     mainWindow.setMenuBarVisibility(false);
 
-    // Load the main UI
-    mainWindow.loadFile(path.join(__dirname, 'index.html'));
+    // Create and attach a BrowserView
+    browserView = new BrowserView();
+    mainWindow.setBrowserView(browserView);
 
-    // Add a right-click context menu for opening DevTools
-    mainWindow.webContents.on('context-menu', (event, params) => {
-        const contextMenu = Menu.buildFromTemplate([
-            {
-                label: 'Open DevTools',
-                click: () => {
-                    mainWindow.webContents.openDevTools({ mode: 'detach' }); // Open in a detached window
-                },
-            },
-        ]);
-        contextMenu.popup();
+    // Set BrowserView bounds
+    browserView.setBounds({ x: 0, y: 50, width: 1200, height: 750 });
+
+    // Load initial URL
+    browserView.webContents.loadURL('about:blank');
+
+    // Add a toolbar interface
+    mainWindow.loadFile(path.join(__dirname, 'toolbar.html'));
+
+    // Handle navigation events from the toolbar
+    const { ipcMain } = require('electron');
+
+    ipcMain.on('navigate-back', () => {
+        if (browserView.webContents.canGoBack()) browserView.webContents.goBack();
     });
 
-    // Register a global shortcut for Ctrl+F12 to toggle DevTools
-    const isShortcutRegistered = globalShortcut.register('Control+F12', () => {
-        if (mainWindow) {
-            if (mainWindow.webContents.isDevToolsOpened()) {
-                mainWindow.webContents.closeDevTools(); // Close if already open
-            } else {
-                mainWindow.webContents.openDevTools(); // Open if closed
-            }
+    ipcMain.on('navigate-forward', () => {
+        if (browserView.webContents.canGoForward()) browserView.webContents.goForward();
+    });
+
+    ipcMain.on('reload', () => {
+        browserView.webContents.reload();
+    });
+
+    ipcMain.on('navigate-to', (event, url) => {
+        const fullUrl = url.startsWith('http') || url.startsWith('virts://') ? url : `http://${url}`;
+        browserView.webContents.loadURL(fullUrl);
+    });
+
+    // Add DevTools shortcut
+    globalShortcut.register('Control+F12', () => {
+        if (mainWindow.webContents.isDevToolsOpened()) {
+            mainWindow.webContents.closeDevTools();
+        } else {
+            mainWindow.webContents.openDevTools();
         }
     });
-
-    // Log if the shortcut registration was successful
-    console.log(`Shortcut Ctrl+F12 registered: ${isShortcutRegistered}`);
 });
 
 app.on('window-all-closed', () => {
@@ -91,6 +97,5 @@ app.on('window-all-closed', () => {
 });
 
 app.on('will-quit', () => {
-    // Unregister all shortcuts when the app quits
     globalShortcut.unregisterAll();
 });
