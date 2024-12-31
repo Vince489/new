@@ -1,6 +1,7 @@
 const { app, BrowserWindow, BrowserView, protocol, ipcMain, globalShortcut } = require('electron');
 const mongoose = require('mongoose'); // MongoDB Client
 const { Client } = require('rpc-websockets'); // WebSocket Client
+const DNS = require('./models/DNS'); // MongoDB Model
 
 let mainWindow;
 let browserView;
@@ -16,14 +17,6 @@ const connectDB = async () => {
     }
 };
 
-// DNS Schema
-const DNSSchema = new mongoose.Schema({
-    domain: { type: String, required: true, unique: true }, // e.g., 'example.huh'
-    path: { type: String, required: true },                // e.g., 'https://example.com/path'
-});
-
-const DNS = mongoose.model('DNS', DNSSchema);
-
 // Initialize WebSocket Client
 const rpcClient = new Client('ws://localhost:8080');
 
@@ -35,36 +28,41 @@ rpcClient.on('close', () => {
     console.error('WebSocket connection closed. Attempting to reconnect...');
     setTimeout(() => {
         rpcClient.connect('ws://localhost:8080');
-    }, 5000);
+    }, 1000);
 });
 rpcClient.on('error', (error) => {
     console.error('WebSocket error:', error.message);
 });
 
 // Register the virts:// protocol
-async function registerVirtsProtocol() {
-    protocol.registerHttpProtocol('virts', async (request, callback) => {
+function registerVirtsProtocol() {
+    protocol.handle('virts', async (request) => {
         const url = request.url.replace('virts://', '').trim();
         console.log(`Requested URL: ${url}`);
 
         try {
-            // Fetch the DNS map directly from MongoDB
+            // Query the database for the requested domain
             const dnsEntry = await DNS.findOne({ domain: url });
+
             if (dnsEntry && dnsEntry.path.startsWith('http')) {
                 console.log('Redirecting to custom URL from DB:', dnsEntry.path);
-                callback({ url: dnsEntry.path });
+                return { url: dnsEntry.path };
             } else {
-                // Fallback to regular web domain if not found in the database
+                // Fallback to a regular web URL if no matching domain is found
                 const regularUrl = `https://${url}`;
                 console.log('Redirecting to regular web URL:', regularUrl);
-                callback({ url: regularUrl });
+                return { url: regularUrl };
             }
         } catch (error) {
-            console.error('Error fetching DNS map from DB:', error);
-            callback({ url: 'https://your-500-page-url.com' }); // Fallback error page
+            console.error('Error fetching DNS entry from DB:', error.message);
+            // Fallback to an error page
+            return { url: 'https://your-500-page-url.com' };
         }
     });
+
+    console.log('virts:// protocol registered successfully');
 }
+
 
 function createMainWindow() {
     mainWindow = new BrowserWindow({
